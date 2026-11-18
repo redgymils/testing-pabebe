@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LOCAL STREAM LIVE</title>
+  
+  <!-- Load Shaka Player -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/shaka-player.compiled.js"></script>
+  
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1rem;
+      margin: 0;
+    }
+    
+    .player-container {
+      width: 100%;
+      max-width: 900px;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 15px;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+      box-sizing: border-box;
+      margin-top: 20px;
+    }
+
+    video {
+      width: 100%;
+      border-radius: 8px;
+      background: #000;
+      aspect-ratio: 16 / 9;
+    }
+
+    .channel-selector {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-weight: 600;
+    }
+
+    button:hover, button.active {
+      background: rgba(255, 255, 255, 0.25);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="player-container">
+    <video id="video" controls autoplay></video>
+    
+    <div class="channel-selector" id="controls">
+      <button onclick="switchStream(0)">Main Live</button>
+      <button onclick="switchStream(1)">Dining Area</button>
+      <button onclick="switchStream(2)">External Den</button>
+      <button onclick="switchStream(3)">Live Episode</button>
+    </div>
+  </div>
+
+  <script>
+    // Extracted URLs and ClearKeys
+    const channels = [
+      {
+        url: "https://pbb-proxy.redgymils.workers.dev/api/live/mpd/all.mpd",
+        kid: "b75e0a8315d0499b834c00a3d5b91935",
+        key: "39876c3c4f32a11dee56078febbb67dd"
+      },
+      {
+        url: "https://pbb-proxy.redgymils.workers.dev/api/live/mpd/din.mpd",
+        kid: "ea6588d030c94ca89925ac0c49974430",
+        key: "3e6de4afee1eff8e14f9506b76ac9ee6"
+      },
+      {
+        url: "https://pbb-proxy.redgymils.workers.dev/api/live/mpd/ext.mpd",
+        kid: "b750a40736a24e60b5a4f256208b92c5",
+        key: "af07292597f692726dcac2bd297ddf8e"
+      },
+      {
+        url: "https://pbb-proxy.redgymils.workers.dev/api/live/mpd/main.mpd",
+        kid: "1044e7ece2d741bcafe80d8613da104f",
+        key: "f5e17f169ff05ea40c5d3f065f523942"
+      }
+    ];
+
+    let player;
+
+    async function initApp() {
+      shaka.polyfill.installAll();
+
+      if (shaka.Player.isBrowserSupported()) {
+        const video = document.getElementById('video');
+        player = new shaka.Player();
+        await player.attach(video);
+        
+        player.addEventListener('error', onErrorEvent);
+        
+        switchStream(0);
+      } else {
+        console.error('Browser not supported!');
+      }
+    }
+
+    async function switchStream(index) {
+      const channel = channels[index];
+      
+      // Update Active Button Style
+      const buttons = document.querySelectorAll('.channel-selector button');
+      buttons.forEach((btn, i) => btn.classList.toggle('active', i === index));
+
+      // Inject DRM Keys
+      const clearKeys = {};
+      clearKeys[channel.kid] = channel.key;
+
+      player.configure({
+        drm: {
+          clearKeys: clearKeys
+        }
+      });
+
+      try {
+        await player.load(channel.url);
+        console.log(`Playing Channel ${index + 1}`);
+      } catch (e) {
+        console.error('Stream load error:', e);
+      }
+    }
+
+    function onErrorEvent(event) {
+      console.error('Player Error', event.detail);
+    }
+
+    document.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
