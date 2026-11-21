@@ -134,16 +134,14 @@ async function switchStream(index) {
   });
 
   els.overlayChannelName.textContent = channel.name;
+  els.qualitySelect.value = "auto";
   els.stage.classList.remove("has-error");
   els.stage.classList.add("is-loading");
   setOnlineStatus(true, "Connecting");
 
   player.configure({
     drm: { clearKeys: { [channel.kid]: channel.key } },
-    abr: { enabled: true },
-    streaming: {
-      retryParameters: { maxAttempts: 4, baseDelay: 800, backoffFactor: 2 }
-    }
+    abr: { enabled: true }
   });
 
   try {
@@ -315,6 +313,27 @@ async function initApp() {
 
   player = new shaka.Player();
   await player.attach(els.video);
+
+  // Fast live-startup & low-latency configuration
+  player.configure({
+    abr: {
+      enabled: true,
+      defaultBandwidthEstimate: 2_500_000,
+      switchInterval: 4
+    },
+    streaming: {
+      lowLatencyMode: true,
+      bufferingGoal: 6,
+      rebufferingGoal: 1,
+      inaccurateManifestTolerance: 0,
+      retryParameters: { maxAttempts: 4, baseDelay: 500, backoffFactor: 2 }
+    },
+    manifest: {
+      dash: {
+        ignoreMinBufferTime: true
+      }
+    }
+  });
 
   player.addEventListener("error", (event) => {
     console.error("Shaka Error:", event.detail);
