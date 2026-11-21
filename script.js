@@ -17,9 +17,10 @@ const tlClose = document.getElementById("tl-close");
 const tlSort = document.getElementById("tl-sort");
 const tlFs = document.getElementById("tl-fs");
 
+const YT_CFG = (typeof YOUTUBE_CONFIG !== "undefined") ? YOUTUBE_CONFIG : {};
 const PROGRESS_KEY = "pbb_ep_progress_v1";
 const LAST_EP_KEY = "pbb_last_video_id_v1";
-const CACHE_KEY = "pbb_yt_playlist_cache_v1_" + (YOUTUBE_CONFIG?.playlistId || "");
+const CACHE_KEY = "pbb_yt_playlist_cache_v1_" + (YT_CFG.playlistId || "");
 
 let episodes = [];
 let currentVideoId = null;
@@ -53,7 +54,6 @@ function getProgressMap() {
 function saveProgress(videoId, currentTime, duration) {
   if (!videoId || !duration || duration < 10) return;
   const map = getProgressMap();
-  // Clear resume marker if user finished > 96% of the episode
   if (currentTime / duration > 0.96) {
     delete map[videoId];
   } else if (currentTime >= 5) {
@@ -89,7 +89,6 @@ function formatMinutesLabel(seconds) {
 }
 
 function formatAirDate(isoDate, title) {
-  // Prefer date written in PBB title (e.g., "October 24, 2026")
   const titleDateMatch = title.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}/i);
   const parsed = new Date(titleDateMatch ? titleDateMatch[0] : isoDate);
   if (isNaN(parsed.getTime())) return "";
@@ -109,7 +108,7 @@ function escapeHTML(str) {
 
 // === YOUTUBE DATA API v3 AUTO-FETCHER ===
 async function fetchPlaylistEpisodes(forceRefresh = false) {
-  const { apiKey, playlistId, cacheMinutes = 15 } = YOUTUBE_CONFIG || {};
+  const { apiKey, playlistId, cacheMinutes = 15 } = YT_CFG;
 
   if (!apiKey || apiKey === "PASTE_YOUR_YOUTUBE_API_KEY_HERE") {
     setLoad(false);
@@ -121,7 +120,6 @@ async function fetchPlaylistEpisodes(forceRefresh = false) {
     return;
   }
 
-  // Check browser cache first
   if (!forceRefresh) {
     try {
       const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
@@ -136,7 +134,6 @@ async function fetchPlaylistEpisodes(forceRefresh = false) {
   setLoad(true, "Loading Episodes", "Fetching latest playlist from YouTube...");
 
   try {
-    // 1. Fetch all playlist items (handles pagination automatically)
     const rawItems = [];
     let nextPageToken = "";
 
@@ -170,7 +167,6 @@ async function fetchPlaylistEpisodes(forceRefresh = false) {
       nextPageToken = data.nextPageToken || "";
     } while (nextPageToken);
 
-    // 2. Fetch exact video durations in batches of 50
     const durationMap = {};
     for (let i = 0; i < rawItems.length; i += 50) {
       const batchIds = rawItems.slice(i, i + 50).map((v) => v.videoId).join(",");
@@ -224,7 +220,6 @@ function onEpisodesLoaded() {
     return;
   }
 
-  // Resume last watched episode or start with Episode 1
   const lastId = localStorage.getItem(LAST_EP_KEY);
   const initialEp = episodes.find((e) => e.videoId === lastId) || episodes[0];
   playEpisode(initialEp.videoId, false);
@@ -333,7 +328,6 @@ function updateActiveCardUI() {
       existingBadge.remove();
     }
 
-    // Refresh resume label & bar
     const prog = progressMap[id];
     const info = card.querySelector(".ep-info");
     let resumeEl = info.querySelector(".ep-resume");
@@ -420,7 +414,6 @@ function onPlayerStateChange(event) {
     recordCurrentTime();
     updateActiveCardUI();
   }
-  // Auto-play next episode when current finishes
   if (event.data === YT.PlayerState.ENDED) {
     const idx = episodes.findIndex((e) => e.videoId === currentVideoId);
     if (idx !== -1 && idx + 1 < episodes.length) {
@@ -501,7 +494,7 @@ if (tlFs) {
 }
 
 // === SPLASH SCREEN & SUPPORT MODAL ===
-window.addEventListener("load", function () {
+function initApp() {
   fetchPlaylistEpisodes(false);
 
   const splash = document.getElementById("splash-screen");
@@ -540,7 +533,13 @@ window.addEventListener("load", function () {
       if (e.target === supportModal) supportModal.classList.add("hidden");
     });
   }
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initApp);
+} else {
+  initApp();
+}
 
 // Copy Button Logic
 document.querySelectorAll(".copy-btn").forEach((btn) => {
